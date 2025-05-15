@@ -40,6 +40,13 @@ def load_data():
 
 df = load_data()
 
+# Sidebar Filters
+st.sidebar.header("Filter Options")
+user_filter = st.sidebar.multiselect("Select Users", options=df["user_first_name"].unique())
+
+if user_filter:
+    df = df[df["user_first_name"].isin(user_filter)]
+
 # KPIs
 col1, col2, col3 = st.columns(3)
 col1.metric("Total Tasks", df.shape[0])
@@ -59,14 +66,11 @@ with tab2:
     st.subheader("🔄 Donut Chart: Tasks per User")
     user_task_counts = df["user_first_name"].value_counts().reset_index()
     user_task_counts.columns = ["User", "Task Count"]
-    
-    donut_fig = px.pie(user_task_counts, values="Task Count", names="User", hole=0.4, 
-                       title="Task Distribution by User", color_discrete_sequence=px.colors.sequential.Reds)
+    donut_fig = px.pie(user_task_counts, values="Task Count", names="User", hole=0.4, title="Task Distribution by User", color_discrete_sequence=px.colors.sequential.Reds)
     st.plotly_chart(donut_fig, use_container_width=True)
 
     st.subheader("📊 Task Duration Histogram")
-    hist_fig = px.histogram(df, x="Hours", nbins=20, title="Distribution of Task Durations (Hours)",
-                            color_discrete_sequence=['red'])
+    hist_fig = px.histogram(df, x="Hours", nbins=20, title="Distribution of Task Durations (Hours)", color_discrete_sequence=['red'])
     st.plotly_chart(hist_fig, use_container_width=True)
 
 # Tab 3: Time Analysis
@@ -75,9 +79,7 @@ with tab3:
     if "user_first_name" in df.columns:
         df_grouped = df.groupby([df["started_at"].dt.date, "user_first_name"])["Hours"].sum().reset_index()
         df_grouped["started_at"] = pd.to_datetime(df_grouped["started_at"])
-        area_fig = px.area(df_grouped, x="started_at", y="Hours", color="user_first_name", 
-                           title="Hours Worked Over Time by User", 
-                           color_discrete_sequence=px.colors.sequential.Reds)
+        area_fig = px.area(df_grouped, x="started_at", y="Hours", color="user_first_name", title="Hours Worked Over Time by User", color_discrete_sequence=px.colors.sequential.Reds)
         st.plotly_chart(area_fig, use_container_width=True)
     else:
         st.warning("User data not available for time-based breakdown.")
