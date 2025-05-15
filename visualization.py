@@ -1,112 +1,68 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from collections import Counter
 import matplotlib.pyplot as plt
-from wordcloud import WordCloud
-import plotly.graph_objects as go
-import plotly.express as px
+import seaborn as sns
 import os
 import warnings
-import string
-import re
 import nltk
 from nltk.stem import WordNetLemmatizer
 
+# Streamlit page configuration
+st.set_page_config(page_title="Unique Task Dashboard", layout="wide")
+
+# Ensure NLTK resources are downloaded
 nltk.download('stopwords')
 nltk.download('wordnet')
 
 warnings.filterwarnings("ignore", message="Converting to PeriodArray/Index representation will drop timezone information")
 
-st.set_page_config(page_title="Task Dashboard", layout="wide")
-
-st.markdown("""
-    <style>
-        .main, .block-container {
-            background-color: black;
-            color: lightgreen;
-        }
-        .css-18e3th9 {
-            background-color: black;
-        }
-        .css-1d391kg, .css-1v0mbdj, .css-ffhzg2, .css-1dp5vir, .stMetric {
-            color: lightgreen !important;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
+# Load main data
 @st.cache_data
-
 def load_data():
     csv_files = [file for file in os.listdir('.') if file.endswith('.csv')]
+
     if not csv_files:
-        st.warning("No CSV files found.")
+        st.error("No CSV files found in the directory.")
         return pd.DataFrame()
 
     dataframes = [pd.read_csv(file) for file in csv_files]
     combined_df = pd.concat(dataframes, ignore_index=True)
 
-    combined_df['started_at'] = pd.to_datetime(combined_df['started_at'], errors='coerce')
-    combined_df.dropna(subset=['started_at'], inplace=True)
+    combined_df['Date'] = pd.to_datetime(combined_df['started_at'], errors='coerce')
 
-    combined_df['year_month'] = combined_df['started_at'].dt.to_period('M').astype(str)
-    combined_df['Hours'] = combined_df['minutes'] / 60
-
-    # Categorization logic
-    categories = {
-        "technology": ["website", "sql", "backend", "repository", "ai", "coding", "file", "database"],
-        "actions": ["reviewed", "created", "tested", "fixed"],
-        "design": ["logo", "design", "layout"],
-        "writing": ["blog", "guide", "documentation"],
-        "meetings": ["meeting", "call", "discussion"],
-        "business": ["grant", "funding", "startup"],
-        "errors": ["bug", "error", "issue"],
-        "time": ["hour", "day", "week"],
-        "miscellaneous": []
-    }
-
-    def categorize_text(text):
-        categories_found = []
-        for category, keywords in categories.items():
-            if any(keyword in text.lower() for keyword in keywords):
-                categories_found.append(category)
-        return categories_found if categories_found else ["miscellaneous"]
-
-    combined_df['Categorized'] = combined_df['task'].astype(str).apply(categorize_text)
+    # Text processing
+    lemmatizer = WordNetLemmatizer()
+    combined_df['task_processed'] = combined_df['task'].str.lower().str.replace('[^a-z ]', '', regex=True)
+    combined_df['task_lemmatized'] = combined_df['task_processed'].apply(lambda x: ' '.join([lemmatizer.lemmatize(word) for word in x.split()]))
 
     return combined_df
 
-combined_df = load_data()
+# Load data
+data = load_data()
 
-st.title("📊 Task Dashboard")
+# Sidebar filters
 st.sidebar.header("Filters")
+project_ids = st.sidebar.multiselect("Select Project ID", options=data['ProjectID'].unique())
 
-categories = st.sidebar.multiselect("Select Categories", options=["technology", "actions", "design", "writing", "meetings", "business", "errors", "time", "miscellaneous"])
-date_filter = st.sidebar.date_input("Filter by Date Range", [])
+# Filter data
+filtered_data = data.copy()
+if project_ids:
+    filtered_data = filtered_data[filtered_data['ProjectID'].isin(project_ids)]
 
-filtered_data = combined_df.copy()
-
-if categories:
-    filtered_data = filtered_data[filtered_data['Categorized'].apply(lambda x: any(cat in x for cat in categories))]
-
-if len(date_filter) == 2:
-    start_date, end_date = pd.to_datetime(date_filter)
-    filtered_data = filtered_data[(filtered_data['started_at'] >= start_date) & (filtered_data['started_at'] <= end_date)]
-
-st.subheader("Overview")
-col1, col2 = st.columns(2)
-col1.metric("Total Tasks", filtered_data.shape[0])
-col2.metric("Total Hours", round(filtered_data["Hours"].sum(), 2))
-
+# Visualization
+st.title("Task Dashboard")
 st.subheader("Task Distribution by Category")
-fig_cat = px.bar(filtered_data.explode('Categorized')['Categorized'].value_counts().reset_index(), 
-                 x='index', y='Categorized', color='Categorized', title='Tasks by Category')
-st.plotly_chart(fig_cat, use_container_width=True)
+category_counts = filtered_data['task_lemmatized'].str.split().explode().value_counts().nlargest(10)
+fig, ax = plt.subplots()
+sns.barplot(x=category_counts.values, y=category_counts.index, ax=ax, palette="viridis")
+ax.set_title("Top 10 Task Keywords")
+st.pyplot(fig)
 
-st.subheader("Time Trends")
-hours_time = filtered_data.groupby('year_month')['Hours'].sum().reset_index()
-fig_hours = px.line(hours_time, x='year_month', y='Hours', title='Total Hours Over Time', markers=True)
-st.plotly_chart(fig_hours, use_container_width=True)
+st.subheader("Task Trend Over Time")
+date_trend = filtered_data.groupby(filtered_data['Date'].dt.to_period('M')).size()
+st.line_chart(date_trend)
 
-st.subheader("Filtered Data")
-st.dataframe(filtered_data)
+# Download filtered data
+csv_data = filtered_data.to_csv(index=False).encode('utf-8')
+st.sidebar.download_button("Download Filtered Data", data=csv_data, file_name="filtered_tasks.csv")
