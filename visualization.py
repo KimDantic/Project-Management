@@ -52,6 +52,28 @@ def load_data():
     combined_df['year_month'] = combined_df['started_at'].dt.to_period('M').astype(str)
     combined_df['Hours'] = combined_df['minutes'] / 60
 
+    # Categorization logic
+    categories = {
+        "technology": ["website", "sql", "backend", "repository", "ai", "coding", "file", "database"],
+        "actions": ["reviewed", "created", "tested", "fixed"],
+        "design": ["logo", "design", "layout"],
+        "writing": ["blog", "guide", "documentation"],
+        "meetings": ["meeting", "call", "discussion"],
+        "business": ["grant", "funding", "startup"],
+        "errors": ["bug", "error", "issue"],
+        "time": ["hour", "day", "week"],
+        "miscellaneous": []
+    }
+
+    def categorize_text(text):
+        categories_found = []
+        for category, keywords in categories.items():
+            if any(keyword in text.lower() for keyword in keywords):
+                categories_found.append(category)
+        return categories_found if categories_found else ["miscellaneous"]
+
+    combined_df['Categorized'] = combined_df['task'].astype(str).apply(categorize_text)
+
     return combined_df
 
 combined_df = load_data()
