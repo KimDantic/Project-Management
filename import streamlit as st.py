@@ -5,7 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import os
 
-st.set_page_config(page_title="Task Dashboard", layout="wide")
+st.set_page_config(page_title="Project Management Dashboard", layout="wide")
 
 # White theme styling
 st.markdown("""
@@ -23,7 +23,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📊 Task Dashboard (White Theme)")
+st.title("📊 Project Management Dashboard")
 
 # Load data
 @st.cache_data
@@ -81,9 +81,12 @@ with tab3:
     line_fig = px.line(time_df, x="started_at", y="Hours", title="Total Hours Over Time", markers=True, color_discrete_sequence=['#FF5733'])
     st.plotly_chart(line_fig, use_container_width=True)
 
-    st.subheader("📌 Task Category Breakdown")
-    pie_fig = px.pie(df, names="task", title="Task Category Distribution", hole=0.3)
-    st.plotly_chart(pie_fig, use_container_width=True)
+    st.subheader("📌 Task Distribution by Category")
+    if "task" in df.columns:
+        task_counts = df["task"].value_counts().reset_index()
+        task_counts.columns = ["Task", "Count"]
+        pie_fig = px.pie(task_counts, names="Task", values="Count", title="Task Distribution", hole=0.3)
+        st.plotly_chart(pie_fig, use_container_width=True)
 
 # Tab 4: Geographic Analysis
 with tab4:
