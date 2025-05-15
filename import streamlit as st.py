@@ -4,6 +4,7 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import os
+from collections import Counter
 
 st.set_page_config(page_title="Project Management Dashboard", layout="wide")
 
@@ -44,6 +45,13 @@ df = load_data()
 st.sidebar.header("Filter Options")
 search_term = st.sidebar.text_input("Search Tasks")
 user_filter = st.sidebar.selectbox("Select User", options=["All"] + list(df["user_first_name"].unique()))
+categories = st.sidebar.multiselect("Select Categories", options=df["task"].unique())
+
+all_words = [word for task in df["task"].dropna() for word in task.split()]
+common_words = Counter(all_words).most_common(20)
+
+if categories:
+    df = df[df["task"].isin(categories)]
 
 if user_filter != "All":
     df = df[df["user_first_name"] == user_filter]
@@ -74,19 +82,16 @@ with tab2:
     bar_fig = px.bar(user_task_counts, x="User", y="Task Count", title="Task Distribution by User", color="Task Count", color_continuous_scale='Viridis')
     st.plotly_chart(bar_fig, use_container_width=True)
 
+    st.subheader("Top 20 Words in Tasks")
+    word_df = pd.DataFrame(common_words, columns=["Word", "Count"])
+    st.dataframe(word_df, use_container_width=True)
+
 # Tab 3: Analytics
 with tab3:
     st.subheader("📈 Hours Over Time")
     time_df = df.groupby([df["started_at"].dt.date])['Hours'].sum().reset_index()
     line_fig = px.line(time_df, x="started_at", y="Hours", title="Total Hours Over Time", markers=True, color_discrete_sequence=['#FF5733'])
     st.plotly_chart(line_fig, use_container_width=True)
-
-    st.subheader("📌 Task Distribution by Category")
-    if "task" in df.columns:
-        task_counts = df["task"].value_counts().reset_index()
-        task_counts.columns = ["Task", "Count"]
-        pie_fig = px.pie(task_counts, names="Task", values="Count", title="Task Distribution", hole=0.3)
-        st.plotly_chart(pie_fig, use_container_width=True)
 
 # Tab 4: Task Completion Patterns
 with tab4:
@@ -96,7 +101,3 @@ with tab4:
 
     bar_fig = px.bar(weekday_counts, x=weekday_counts.index, y=weekday_counts.values, title="Tasks Completed by Day of the Week", color=weekday_counts.values, color_continuous_scale='Viridis')
     st.plotly_chart(bar_fig, use_container_width=True)
-
-    hour_df = df["started_at"].dt.hour.value_counts().sort_index()
-    hour_fig = px.bar(hour_df, x=hour_df.index, y=hour_df.values, title="Tasks Completed by Hour of the Day", color=hour_df.values, color_continuous_scale='Viridis')
-    st.plotly_chart(hour_fig, use_container_width=True)
