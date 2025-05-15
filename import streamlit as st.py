@@ -7,15 +7,15 @@ import os
 
 st.set_page_config(page_title="Task Dashboard", layout="wide")
 
-# Red theme styling
+# Grey theme styling
 st.markdown("""
     <style>
         .main, .block-container {
-            background-color: red;
+            background-color: #2f2f2f;
             color: white;
         }
         .css-18e3th9 {
-            background-color: red;
+            background-color: #2f2f2f;
         }
         .css-1d391kg, .css-1v0mbdj, .css-ffhzg2, .css-1dp5vir, .stMetric {
             color: white !important;
@@ -23,7 +23,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📊 Task Dashboard (Red Theme)")
+st.title("📊 Task Dashboard (Grey Theme)")
 
 # Load data
 @st.cache_data
@@ -42,10 +42,14 @@ df = load_data()
 
 # Sidebar Filters
 st.sidebar.header("Filter Options")
-user_filter = st.sidebar.multiselect("Select Users", options=df["user_first_name"].unique())
+search_term = st.sidebar.text_input("Search Tasks")
+user_filter = st.sidebar.selectbox("Select User", options=["All"] + list(df["user_first_name"].unique()))
 
-if user_filter:
-    df = df[df["user_first_name"].isin(user_filter)]
+if user_filter != "All":
+    df = df[df["user_first_name"] == user_filter]
+
+if search_term:
+    df = df[df["task"].str.contains(search_term, case=False, na=False)]
 
 # KPIs
 col1, col2, col3 = st.columns(3)
@@ -53,8 +57,8 @@ col1.metric("Total Tasks", df.shape[0])
 col2.metric("Total Hours", round(df["Hours"].sum(), 2))
 col3.metric("Unique Users", df["user_first_name"].nunique())
 
-# Tabs for Visuals
-tab1, tab2, tab3 = st.tabs(["📋 Data Table", "🧑‍💼 User Insights", "📅 Time Insights"])
+# Tabs for Visuals with new design
+tab1, tab2, tab3 = st.tabs(["📋 Data Table", "🧑‍💼 User Insights", "📊 Analytics"])
 
 # Tab 1: Raw Data
 with tab1:
@@ -63,23 +67,18 @@ with tab1:
 
 # Tab 2: User Analysis
 with tab2:
-    st.subheader("🔄 Donut Chart: Tasks per User")
+    st.subheader("🔄 User Task Distribution")
     user_task_counts = df["user_first_name"].value_counts().reset_index()
     user_task_counts.columns = ["User", "Task Count"]
-    donut_fig = px.pie(user_task_counts, values="Task Count", names="User", hole=0.4, title="Task Distribution by User", color_discrete_sequence=px.colors.sequential.Reds)
-    st.plotly_chart(donut_fig, use_container_width=True)
+    bar_fig = px.bar(user_task_counts, x="User", y="Task Count", title="Task Distribution by User", color="Task Count", color_continuous_scale='Blues')
+    st.plotly_chart(bar_fig, use_container_width=True)
 
-    st.subheader("📊 Task Duration Histogram")
-    hist_fig = px.histogram(df, x="Hours", nbins=20, title="Distribution of Task Durations (Hours)", color_discrete_sequence=['red'])
-    st.plotly_chart(hist_fig, use_container_width=True)
-
-# Tab 3: Time Analysis
+# Tab 3: Analytics
 with tab3:
-    st.subheader("📈 Cumulative Hours Over Time (By User)")
+    st.subheader("📈 Hours Over Time")
     if "user_first_name" in df.columns:
-        df_grouped = df.groupby([df["started_at"].dt.date, "user_first_name"])["Hours"].sum().reset_index()
-        df_grouped["started_at"] = pd.to_datetime(df_grouped["started_at"])
-        area_fig = px.area(df_grouped, x="started_at", y="Hours", color="user_first_name", title="Hours Worked Over Time by User", color_discrete_sequence=px.colors.sequential.Reds)
-        st.plotly_chart(area_fig, use_container_width=True)
+        time_df = df.groupby([df["started_at"].dt.date])["Hours"].sum().reset_index()
+        line_fig = px.line(time_df, x="started_at", y="Hours", title="Total Hours Over Time", markers=True, color_discrete_sequence=['#00BFFF'])
+        st.plotly_chart(line_fig, use_container_width=True)
     else:
-        st.warning("User data not available for time-based breakdown.")
+        st.warning("No data available for time-based breakdown.")
