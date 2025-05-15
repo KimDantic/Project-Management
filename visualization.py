@@ -4,14 +4,14 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import requests
 from wordcloud import WordCloud  # Import wordcloud
+import subprocess
+import sys
 
 # Function to install wordcloud (only needed if not already installed)
 def install_wordcloud():
     try:
         import wordcloud
     except ImportError:
-        import subprocess
-        import sys
         st.warning("Installing wordcloud library...")
         subprocess.check_call([sys.executable, "-m", "pip", "install", "wordcloud"])
         st.success("wordcloud library installed successfully. Please rerun the app.")
