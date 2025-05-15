@@ -1,101 +1,68 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-from collections import Counter
-import matplotlib.pyplot as plt
 import seaborn as sns
-import os
-import warnings
-import string
-import re
-import nltk
-from nltk.stem import WordNetLemmatizer
-import plotly.express as px
-
-# Ensure NLTK resources are downloaded
-nltk.download('stopwords')
-nltk.download('wordnet')
-
-warnings.filterwarnings("ignore", message="Converting to PeriodArray/Index representation will drop timezone information")
-
-# Streamlit page configuration
-st.set_page_config(page_title="Task Dashboard", layout="wide")
-
-# Apply custom CSS for black background without sidebar
-st.markdown(
-    """
-    <style>
-    body {background-color: #000000; color: #FFFFFF;}
-    .stSidebar {display: none;}
-    .stTabs > div {background-color: #000000; color: #FFFFFF;}
-    .stMarkdown {color: #FFFFFF;}
-    .css-18e3th9 {background-color: #000000; color: #FFFFFF;}
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+import matplotlib.pyplot as plt
 
 # Load data
 @st.cache_data
 def load_data():
-    csv_files = [file for file in os.listdir('.') if file.endswith('.csv')]
+    # Replace with your GitHub data loading logic
+    url = 'https://api.github.com/repos/romero220/projectmanagement/contents/'
+    token = st.secrets['GITHUB_TOKEN']
+    headers = {'Authorization': f'token {token}'}
 
-    if not csv_files:
-        print("No CSV files found in the repository.")
-        return pd.DataFrame()
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+    files = response.json()
+
+    csv_files = [(file['name'], file['download_url']) for file in files if file['name'].endswith('.csv')]
 
     dataframes = []
-    for filename in csv_files:
-        df = pd.read_csv(filename)
-        numeric_id = filename.split('-')[2] if '-' in filename else 'Unknown'
-        df['ProjectID'] = numeric_id
+
+    for filename, url in csv_files:
+        df = pd.read_csv(url)
         dataframes.append(df)
 
     combined_df = pd.concat(dataframes, ignore_index=True)
-    combined_df['ProjectID-ID'] = combined_df['ProjectID'].astype(str) + "-" + combined_df['id'].astype(str)
-    combined_df['Full_Name'] = combined_df['user_first_name'].astype(str) + " " + combined_df['user_last_name'].astype(str)
 
     return combined_df
 
-# Load the data
-combined_df = load_data()
+# Streamlit App
+st.title('Data Analysis Dashboard')
+data = load_data()
 
-# Tabs for graphs
-tab1, tab2, tab3 = st.tabs(["Overview", "Task Count by User", "Filtered Data View"])
+# Sidebar filter
+st.sidebar.title('Filter Data')
+selected_category = st.sidebar.multiselect(
+    'Select Category',
+    options=data['Category'].unique(),
+    default=data['Category'].unique()
+)
 
-# Tab 1: Overview
+filtered_data = data[data['Category'].isin(selected_category)]
+
+# Tabs for visualization
+tab1, tab2, tab3 = st.tabs(['Data Overview', 'Category Distribution', 'Word Cloud'])
+
+# Tab 1: Data Overview
 with tab1:
-    st.subheader("Overview - Task Dashboard")
-    st.write("This dashboard provides an overview of tasks and user performance.")
+    st.header('Data Overview')
+    st.write(filtered_data)
 
-# Tab 2: User Task Count Visualization
+# Tab 2: Category Distribution
 with tab2:
-    st.subheader("Task Count by User")
-    user_task_counts = combined_df['Full_Name'].value_counts().reset_index()
-    user_task_counts.columns = ['Full_Name', 'Task Count']
+    st.header('Category Distribution')
+    plt.figure(figsize=(10, 6))
+    sns.countplot(data=filtered_data, x='Category')
+    st.pyplot(plt.gcf())
 
-    fig_bar = px.bar(
-        user_task_counts,
-        x='Full_Name',
-        y='Task Count',
-        color='Task Count',
-        color_continuous_scale='Blues',
-        title="Task Count by User"
-    )
-
-    fig_bar.update_layout(
-        plot_bgcolor='#000000',
-        paper_bgcolor='#000000',
-        font_color='#FFFFFF',
-        xaxis_title='Users',
-        yaxis_title='Task Count',
-        title_font_size=18,
-        title_x=0.5
-    )
-
-    st.plotly_chart(fig_bar, use_container_width=True)
-
-# Tab 3: Filtered Data View
+# Tab 3: Word Cloud
 with tab3:
-    st.subheader("Filtered Data Preview (First 100 Rows)")
-    st.dataframe(combined_df.head(100), use_container_width=True)
+    st.header('Word Cloud')
+    from wordcloud import WordCloud
+    text = ' '.join(filtered_data['Issue'].dropna())
+    wordcloud = WordCloud(width=800, height=400, background_color='white').generate(text)
+    plt.figure(figsize=(10, 6))
+    plt.imshow(wordcloud, interpolation='bilinear')
+    plt.axis('off')
+    st.pyplot(plt.gcf())
