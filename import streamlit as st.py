@@ -7,23 +7,23 @@ import os
 
 st.set_page_config(page_title="Task Dashboard", layout="wide")
 
-# Grey theme styling
+# White theme styling
 st.markdown("""
     <style>
         .main, .block-container {
-            background-color: #2f2f2f;
-            color: white;
+            background-color: #ffffff;
+            color: black;
         }
         .css-18e3th9 {
-            background-color: #2f2f2f;
+            background-color: #ffffff;
         }
         .css-1d391kg, .css-1v0mbdj, .css-ffhzg2, .css-1dp5vir, .stMetric {
-            color: white !important;
+            color: black !important;
         }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📊 Task Dashboard (Grey Theme)")
+st.title("📊 Task Dashboard (White Theme)")
 
 # Load data
 @st.cache_data
@@ -52,13 +52,14 @@ if search_term:
     df = df[df["task"].str.contains(search_term, case=False, na=False)]
 
 # KPIs
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 col1.metric("Total Tasks", df.shape[0])
 col2.metric("Total Hours", round(df["Hours"].sum(), 2))
 col3.metric("Unique Users", df["user_first_name"].nunique())
+col4.metric("Average Hours/Task", round(df["Hours"].mean(), 2))
 
-# Tabs for Visuals with new design
-tab1, tab2, tab3 = st.tabs(["📋 Data Table", "🧑‍💼 User Insights", "📊 Analytics"])
+# Tabs for Visuals
+tab1, tab2, tab3, tab4 = st.tabs(["📋 Data Table", "🧑‍💼 User Insights", "📊 Analytics", "🌐 Geographic Analysis"])
 
 # Tab 1: Raw Data
 with tab1:
@@ -70,15 +71,25 @@ with tab2:
     st.subheader("🔄 User Task Distribution")
     user_task_counts = df["user_first_name"].value_counts().reset_index()
     user_task_counts.columns = ["User", "Task Count"]
-    bar_fig = px.bar(user_task_counts, x="User", y="Task Count", title="Task Distribution by User", color="Task Count", color_continuous_scale='Blues')
+    bar_fig = px.bar(user_task_counts, x="User", y="Task Count", title="Task Distribution by User", color="Task Count", color_continuous_scale='Viridis')
     st.plotly_chart(bar_fig, use_container_width=True)
 
 # Tab 3: Analytics
 with tab3:
     st.subheader("📈 Hours Over Time")
-    if "user_first_name" in df.columns:
-        time_df = df.groupby([df["started_at"].dt.date])["Hours"].sum().reset_index()
-        line_fig = px.line(time_df, x="started_at", y="Hours", title="Total Hours Over Time", markers=True, color_discrete_sequence=['#00BFFF'])
-        st.plotly_chart(line_fig, use_container_width=True)
+    time_df = df.groupby([df["started_at"].dt.date])['Hours'].sum().reset_index()
+    line_fig = px.line(time_df, x="started_at", y="Hours", title="Total Hours Over Time", markers=True, color_discrete_sequence=['#FF5733'])
+    st.plotly_chart(line_fig, use_container_width=True)
+
+    st.subheader("📌 Task Category Breakdown")
+    pie_fig = px.pie(df, names="task", title="Task Category Distribution", hole=0.3)
+    st.plotly_chart(pie_fig, use_container_width=True)
+
+# Tab 4: Geographic Analysis
+with tab4:
+    st.subheader("🌐 User Locations (If Available)")
+    if "latitude" in df.columns and "longitude" in df.columns:
+        map_fig = px.scatter_mapbox(df, lat="latitude", lon="longitude", hover_name="user_first_name", zoom=2, mapbox_style="open-street-map")
+        st.plotly_chart(map_fig, use_container_width=True)
     else:
-        st.warning("No data available for time-based breakdown.")
+        st.warning("Location data not available.")
