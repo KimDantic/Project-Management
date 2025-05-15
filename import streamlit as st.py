@@ -5,6 +5,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 import os
 from collections import Counter
+from nltk.stem import WordNetLemmatizer
+import nltk
+
+nltk.download('wordnet')
 
 st.set_page_config(page_title="Project Management Dashboard", layout="wide")
 
@@ -37,6 +41,10 @@ def load_data():
     combined_df = pd.concat([pd.read_csv(file) for file in csv_files], ignore_index=True)
     combined_df["Hours"] = combined_df["minutes"] / 60
     combined_df["started_at"] = pd.to_datetime(combined_df["started_at"], errors="coerce")
+
+    lemmatizer = WordNetLemmatizer()
+    combined_df['Lemmatized_Words'] = combined_df['task'].dropna().apply(lambda x: ' '.join([lemmatizer.lemmatize(word) for word in str(x).split()]))
+
     return combined_df
 
 df = load_data()
@@ -67,7 +75,7 @@ col3.metric("Unique Users", df["user_first_name"].nunique())
 col4.metric("Average Hours/Task", round(df["Hours"].mean(), 2))
 
 # Tabs for Visuals
-tab1, tab2, tab3, tab4 = st.tabs(["📋 Data Table", "🧑‍💼 User Insights", "📊 Analytics", "📌 Task Completion Patterns"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📋 Data Table", "🧑‍💼 User Insights", "📊 Analytics", "📌 Task Completion Patterns", "🔤 Lemmatized Words"])
 
 # Tab 1: Raw Data
 with tab1:
@@ -101,3 +109,8 @@ with tab4:
 
     bar_fig = px.bar(weekday_counts, x=weekday_counts.index, y=weekday_counts.values, title="Tasks Completed by Day of the Week", color=weekday_counts.values, color_continuous_scale='Viridis')
     st.plotly_chart(bar_fig, use_container_width=True)
+
+# Tab 5: Lemmatized Words
+with tab5:
+    st.subheader("🔤 Lemmatized Words Table")
+    st.dataframe(df[['task', 'Lemmatized_Words']].dropna(), use_container_width=True)
