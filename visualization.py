@@ -37,7 +37,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 @st.cache_data
-
 def load_data():
     csv_files = [file for file in os.listdir('.') if file.endswith('.csv')]
     if not csv_files:
@@ -73,6 +72,8 @@ def load_data():
     )
 
     combined_df["Hours"] = combined_df["minutes"] / 60
+    combined_df["week"] = pd.to_datetime(combined_df["started_at"], errors="coerce").dt.isocalendar().week
+    combined_df["month"] = pd.to_datetime(combined_df["started_at"], errors="coerce").dt.month
     combined_df["year_month"] = pd.to_datetime(combined_df["started_at"], errors="coerce").dt.to_period("M")
 
     categories = {
@@ -106,7 +107,7 @@ def load_data():
 
 combined_df = load_data()
 
-# Sidebar Filters
+# --- SIDEBAR FILTERS ---
 st.sidebar.header("Filters")
 categories = st.sidebar.multiselect("Select Categories", options=combined_df['Categorized'].explode().unique())
 date_filter = st.sidebar.date_input("Filter by Date", [])
@@ -131,71 +132,117 @@ if len(date_filter) == 2:
 if full_name_filter:
     filtered_data = filtered_data[filtered_data['Full_Name'].isin(full_name_filter)]
 
-# Tabs
-overview_tab, trends_tab, data_tab = st.tabs(["📊 Overview", "📈 Time Trends", "📋 Data Table"])
+# Download button
+csv_data = filtered_data.to_csv(index=False).encode('utf-8')
+st.sidebar.download_button(
+    label="⬇️ Download Filtered CSV",
+    data=csv_data,
+    file_name="filtered_data.csv",
+    mime="text/csv"
+)
 
-with overview_tab:
-    st.title("📊 Dashboard Overview")
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Total Tasks", filtered_data.shape[0])
-    col2.metric("Total Hours", round(filtered_data["Hours"].sum(), 2))
-    col3.metric("Unique Users", filtered_data["Full_Name"].nunique())
-    col4.metric("Unique Projects", filtered_data["ProjectID"].nunique())
+st.title("📊 Task Dashboard Overview")
 
+tabs = st.tabs(["Category Breakdown", "Time Series", "🔠 Word Cloud", "📄 Data Table"])
+
+# --- TAB 1: Category Breakdown ---
+with tabs[0]:
+    st.header("Category Breakdown")
+
+    # Bar chart: Task counts by category
     cat_counts = filtered_data.explode('Categorized')['Categorized'].value_counts()
-    fig_cat = go.Figure()
-    fig_cat.add_trace(go.Bar(x=cat_counts.index, y=cat_counts.values,
-        marker=dict(color=cat_counts.values, colorscale='Greens', line=dict(width=0.8, color='DarkGreen')),
-        hovertemplate='Category: %{x}<br>Tasks: %{y}<extra></extra>'))
-    fig_cat.update_layout(title='Task Counts by Category', xaxis_title='Category', yaxis_title='Number of Tasks',
-                          plot_bgcolor='black', font=dict(color='lightgreen'))
-    st.plotly_chart(fig_cat, use_container_width=True)
+    fig_bar = go.Figure(data=[go.Bar(
+        x=cat_counts.index,
+        y=cat_counts.values,
+        marker=dict(color=cat_counts.values, colorscale='Greens', line=dict(width=0.8, color='DarkGreen'))
+    )])
+    fig_bar.update_layout(
+        title='Task Counts by Category',
+        xaxis_title='Category',
+        yaxis_title='Number of Tasks',
+        xaxis_tickangle=-45,
+        plot_bgcolor='black',
+        font=dict(family='Arial', size=14, color='lightgreen'),
+        margin=dict(l=40, r=40, t=70, b=100),
+        yaxis=dict(gridcolor='darkgreen', zeroline=True, zerolinecolor='darkgreen')
+    )
+    st.plotly_chart(fig_bar, use_container_width=True)
 
-    with st.expander("🔍 Word Cloud: Top 50 Most Common Lemmatized Words"):
-        all_words = [word for sublist in filtered_data['task_wo_punct_split_wo_stopwords_lemmatized'] for word in sublist]
-        word_counts = Counter(all_words).most_common(50)
-        if word_counts:
-            word_freq_dict = dict(word_counts)
-            wordcloud = WordCloud(width=1000, height=500, background_color='black', colormap='Greens').generate_from_frequencies(word_freq_dict)
-            fig_wc, ax = plt.subplots(figsize=(12, 6))
-            ax.imshow(wordcloud, interpolation='bilinear')
-            ax.axis("off")
-            st.pyplot(fig_wc)
-        else:
-            st.write("No word frequency data available for selected filters.")
+    # Pie chart: Category distribution
+    fig_pie = go.Figure(data=[go.Pie(
+        labels=cat_counts.index,
+        values=cat_counts.values,
+        marker=dict(colors=px.colors.sequential.Greens),
+        hole=0.4
+    )])
+    fig_pie.update_layout(
+        title="Task Category Distribution",
+        font=dict(color='lightgreen'),
+        plot_bgcolor='black',
+        paper_bgcolor='black'
+    )
+    st.plotly_chart(fig_pie, use_container_width=True)
 
-with trends_tab:
-    st.title("📈 Time-Based Analysis")
+
+# --- TAB 2: Time Series ---
+with tabs[1]:
+    st.header("Time Series Analysis")
+
+    # Line chart: Total hours worked over time (by year_month)
     hours_time = filtered_data.groupby('year_month')['Hours'].sum().reset_index()
     hours_time['year_month'] = hours_time['year_month'].astype(str)
-    fig_hours = px.line(hours_time, x='year_month', y='Hours', title='Total Hours Over Time', markers=True)
-    fig_hours.update_layout(plot_bgcolor='black', font=dict(color='lightgreen'))
-    st.plotly_chart(fig_hours, use_container_width=True)
 
-    # Monthly task count by category
-    exploded = filtered_data.explode('Categorized')
-    task_month_cat = exploded.groupby(['year_month', 'Categorized']).size().reset_index(name='count')
-    fig_stack = px.bar(task_month_cat, x='year_month', y='count', color='Categorized', title='Monthly Task Count by Category',
-                       labels={'count': 'Task Count'}, color_discrete_sequence=px.colors.sequential.Greens)
-    fig_stack.update_layout(plot_bgcolor='black', font=dict(color='lightgreen'))
-    st.plotly_chart(fig_stack, use_container_width=True)
+    fig_line = go.Figure()
+    fig_line.add_trace(go.Scatter(
+        x=hours_time['year_month'],
+        y=hours_time['Hours'],
+        mode='lines+markers',
+        line=dict(color='lightgreen', width=3),
+        marker=dict(size=8, color='green'),
+        hovertemplate='Month: %{x}<br>Hours: %{y:.2f}<extra></extra>'
+    ))
+    fig_line.update_layout(
+        title='Total Hours Worked Over Time',
+        xaxis_title='Year-Month',
+        yaxis_title='Total Hours',
+        plot_bgcolor='black',
+        font=dict(family='Arial', size=14, color='lightgreen'),
+        margin=dict(l=40, r=40, t=70, b=50),
+        xaxis=dict(showgrid=True, gridcolor='darkgreen'),
+        yaxis=dict(showgrid=True, gridcolor='darkgreen')
+    )
+    st.plotly_chart(fig_line, use_container_width=True)
 
-    # Weekly trends (Optional)
-    weekly_data = filtered_data.groupby('week')['Hours'].sum().reset_index()
-    fig_week = px.line(weekly_data, x='week', y='Hours', title='Weekly Hours Worked', markers=True)
-    fig_week.update_layout(plot_bgcolor='black', font=dict(color='lightgreen'))
-    st.plotly_chart(fig_week, use_container_width=True)
+    # Bar chart: Hours worked per user
+    hours_user = filtered_data.groupby('Full_Name')['Hours'].sum().sort_values(ascending=False).reset_index()
+    fig_bar_user = go.Figure(data=[go.Bar(
+        x=hours_user['Hours'],
+        y=hours_user['Full_Name'],
+        orientation='h',
+        marker=dict(color=hours_user['Hours'], colorscale='Greens')
+    )])
+    fig_bar_user.update_layout(
+        title='Total Hours Worked per User',
+        xaxis_title='Hours',
+        yaxis_title='User',
+        plot_bgcolor='black',
+        font=dict(color='lightgreen'),
+        margin=dict(l=100, r=40, t=70, b=50),
+        yaxis=dict(autorange='reversed')
+    )
+    st.plotly_chart(fig_bar_user, use_container_width=True)
 
-with data_tab:
-    st.title("📋 Filtered Data Table")
-    st.dataframe(filtered_data, use_container_width=True)
 
-    csv_data = filtered_data.to_csv(index=False).encode('utf-8')
-    st.download_button("⬇️ Download Filtered CSV", data=csv_data, file_name="filtered_data.csv", mime="text/csv")
+# --- TAB 3: Word Cloud ---
+with tabs[2]:
+    st.header("Word Cloud & Top Words")
 
-    # Top contributors
-    with st.expander("👤 Top Users by Hours Worked"):
-        top_users = filtered_data.groupby('Full_Name')['Hours'].sum().sort_values(ascending=False).head(10).reset_index()
-        fig_top_users = px.bar(top_users, x='Hours', y='Full_Name', orientation='h', title='Top Users by Hours', color='Hours', color_continuous_scale='greens')
-        fig_top_users.update_layout(plot_bgcolor='black', font=dict(color='lightgreen'), yaxis_title='User')
-        st.plotly_chart(fig_top_users, use_container_width=True)
+    all_words = [word for sublist in filtered_data['task_wo_punct_split_wo_stopwords_lemmatized'] for word in sublist]
+    word_counts = Counter(all_words).most_common(20)
+    word_freq_dict = dict(word_counts)
+
+    col1, col2 = st.columns(2)
+
+    # Word Cloud overall top 20 words
+    with col1:
+        st.markdown("
