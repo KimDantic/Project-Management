@@ -3,7 +3,25 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import requests
-from wordcloud import WordCloud
+from wordcloud import WordCloud  # Import wordcloud
+
+# Function to install wordcloud (only needed if not already installed)
+def install_wordcloud():
+    try:
+        import wordcloud
+    except ImportError:
+        import subprocess
+        import sys
+        st.warning("Installing wordcloud library...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "wordcloud"])
+        st.success("wordcloud library installed successfully. Please rerun the app.")
+        # Important:  You might need to rerun the app after installation.
+        return False  # Indicate that the app should be rerun
+    return True #Indicate that the library is present
+
+# Check if wordcloud is installed, and install if necessary
+if not install_wordcloud():
+    st.stop()  # Stop execution to allow installation and rerun
 
 # Load data
 @st.cache_data
