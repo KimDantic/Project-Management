@@ -59,7 +59,7 @@ col3.metric("Unique Users", df["user_first_name"].nunique())
 col4.metric("Average Hours/Task", round(df["Hours"].mean(), 2))
 
 # Tabs for Visuals
-tab1, tab2, tab3, tab4 = st.tabs(["📋 Data Table", "🧑‍💼 User Insights", "📊 Analytics", "🌐 Geographic Analysis"])
+tab1, tab2, tab3, tab4 = st.tabs(["📋 Data Table", "🧑‍💼 User Insights", "📊 Analytics", "📌 Task Completion Patterns"])
 
 # Tab 1: Raw Data
 with tab1:
@@ -88,11 +88,15 @@ with tab3:
         pie_fig = px.pie(task_counts, names="Task", values="Count", title="Task Distribution", hole=0.3)
         st.plotly_chart(pie_fig, use_container_width=True)
 
-# Tab 4: Geographic Analysis
+# Tab 4: Task Completion Patterns
 with tab4:
-    st.subheader("🌐 User Locations (If Available)")
-    if "latitude" in df.columns and "longitude" in df.columns:
-        map_fig = px.scatter_mapbox(df, lat="latitude", lon="longitude", hover_name="user_first_name", zoom=2, mapbox_style="open-street-map")
-        st.plotly_chart(map_fig, use_container_width=True)
-    else:
-        st.warning("Location data not available.")
+    st.subheader("📊 Task Completion Trends")
+    df["Weekday"] = df["started_at"].dt.day_name()
+    weekday_counts = df["Weekday"].value_counts().reindex(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])
+
+    bar_fig = px.bar(weekday_counts, x=weekday_counts.index, y=weekday_counts.values, title="Tasks Completed by Day of the Week", color=weekday_counts.values, color_continuous_scale='Viridis')
+    st.plotly_chart(bar_fig, use_container_width=True)
+
+    hour_df = df["started_at"].dt.hour.value_counts().sort_index()
+    hour_fig = px.bar(hour_df, x=hour_df.index, y=hour_df.values, title="Tasks Completed by Hour of the Day", color=hour_df.values, color_continuous_scale='Viridis')
+    st.plotly_chart(hour_fig, use_container_width=True)
