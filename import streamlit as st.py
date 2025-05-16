@@ -51,10 +51,10 @@ df = load_data()
 st.sidebar.header("Filter Options")
 search_term = st.sidebar.text_input("Search Tasks")
 user_filter = st.sidebar.selectbox("Select User", options=["All"] + list(df["user_first_name"].unique()))
-categories = st.sidebar.multiselect("Select Categories", options=df["task"].unique())
+category_search = st.sidebar.text_input("Search Categories")
 
-if categories:
-    df = df[df["task"].isin(categories)]
+if category_search:
+    df = df[df["task"].str.contains(category_search, case=False, na=False)]
 
 if user_filter != "All":
     df = df[df["user_first_name"] == user_filter]
