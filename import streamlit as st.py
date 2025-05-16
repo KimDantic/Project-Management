@@ -6,6 +6,8 @@ import os
 from collections import Counter
 from nltk.stem import WordNetLemmatizer
 import nltk
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
 
 nltk.download('wordnet')
 
@@ -21,7 +23,7 @@ st.markdown("""
         .css-18e3th9 {
             background-color: #ffffff;
         }
-        .css-1d391kg, .css-1v0mbdj, .css-ffhzg2, .css-1dp5vir, .stMetric {
+        .css-1d391kg, .css-1v0mbdj, .css-ffhzg2, .stMetric {
             color: black !important;
         }
     """, unsafe_allow_html=True)
@@ -70,7 +72,7 @@ col3.metric("Unique Users", df["user_first_name"].nunique())
 col4.metric("Average Hours/Task", round(df["Hours"].mean(), 2))
 
 # Tabs for Visuals
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📋 Data Table", "🧑‍💼 User Insights", "📊 Analytics", "📌 Task Completion Patterns", "🔤 Lemmatized Words"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📋 Data Table", "🧑‍💼 User Insights", "📊 Analytics", "📌 Task Completion Patterns", "🔤 Lemmatized Words", "☁️ Word Cloud"])
 
 # Tab 1: Raw Data
 with tab1:
@@ -109,3 +111,13 @@ with tab4:
 with tab5:
     st.subheader("🔤 Lemmatized Words Table")
     st.dataframe(df[['task', 'Lemmatized_Words']].dropna(), use_container_width=True)
+
+# Tab 6: Word Cloud
+with tab6:
+    st.subheader("☁️ Task Word Cloud")
+    all_words = ' '.join(df['Lemmatized_Words'].dropna())
+    wordcloud = WordCloud(background_color='white', colormap='viridis', width=800, height=400).generate(all_words)
+    fig, ax = plt.subplots()
+    ax.imshow(wordcloud, interpolation='bilinear')
+    ax.axis('off')
+    st.pyplot(fig)
