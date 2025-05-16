@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-import plotly.graph_objects as go
 import os
 from collections import Counter
 from nltk.stem import WordNetLemmatizer
@@ -25,8 +24,7 @@ st.markdown("""
         .css-1d391kg, .css-1v0mbdj, .css-ffhzg2, .css-1dp5vir, .stMetric {
             color: black !important;
         }
-    </style>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
 st.title("📊 Project Management Dashboard")
 
@@ -54,9 +52,6 @@ st.sidebar.header("Filter Options")
 search_term = st.sidebar.text_input("Search Tasks")
 user_filter = st.sidebar.selectbox("Select User", options=["All"] + list(df["user_first_name"].unique()))
 categories = st.sidebar.multiselect("Select Categories", options=df["task"].unique())
-
-all_words = [word for task in df["task"].dropna() for word in task.split()]
-common_words = Counter(all_words).most_common(20)
 
 if categories:
     df = df[df["task"].isin(categories)]
@@ -90,16 +85,16 @@ with tab2:
     bar_fig = px.bar(user_task_counts, x="User", y="Task Count", title="Task Distribution by User", color="Task Count", color_continuous_scale='Viridis')
     st.plotly_chart(bar_fig, use_container_width=True)
 
-    st.subheader("Top 20 Words in Tasks")
-    word_df = pd.DataFrame(common_words, columns=["Word", "Count"])
-    st.dataframe(word_df, use_container_width=True)
-
 # Tab 3: Analytics
 with tab3:
     st.subheader("📈 Hours Over Time")
     time_df = df.groupby([df["started_at"].dt.date])['Hours'].sum().reset_index()
     line_fig = px.line(time_df, x="started_at", y="Hours", title="Total Hours Over Time", markers=True, color_discrete_sequence=['#FF5733'])
     st.plotly_chart(line_fig, use_container_width=True)
+
+    st.subheader("🏆 Top 5 Users by Hours")
+    top_users = df.groupby('user_first_name')["Hours"].sum().nlargest(5).reset_index()
+    st.dataframe(top_users, use_container_width=True)
 
 # Tab 4: Task Completion Patterns
 with tab4:
