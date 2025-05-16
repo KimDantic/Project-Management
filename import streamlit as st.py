@@ -53,10 +53,11 @@ df = load_data()
 st.sidebar.header("Filter Options")
 search_term = st.sidebar.text_input("Search Tasks")
 user_filter = st.sidebar.selectbox("Select User", options=["All"] + list(df["user_first_name"].unique()))
-category_search = st.sidebar.text_input("Search Categories")
+date_filter = st.sidebar.date_input("Select Date Range", [])
 
-if category_search:
-    df = df[df["task"].str.contains(category_search, case=False, na=False)]
+if len(date_filter) == 2:
+    start_date, end_date = date_filter
+    df = df[(df["started_at"] >= pd.Timestamp(start_date)) & (df["started_at"] <= pd.Timestamp(end_date))]
 
 if user_filter != "All":
     df = df[df["user_first_name"] == user_filter]
@@ -71,53 +72,4 @@ col2.metric("Total Hours", round(df["Hours"].sum(), 2))
 col3.metric("Unique Users", df["user_first_name"].nunique())
 col4.metric("Average Hours/Task", round(df["Hours"].mean(), 2))
 
-# Tabs for Visuals
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📋 Data Table", "🧑‍💼 User Insights", "📊 Analytics", "📌 Task Completion Patterns", "🔤 Lemmatized Words", "☁️ Word Cloud"])
-
-# Tab 1: Raw Data
-with tab1:
-    st.subheader("Complete Data Table")
-    st.dataframe(df, use_container_width=True)
-
-# Tab 2: User Analysis
-with tab2:
-    st.subheader("🔄 User Task Distribution")
-    user_task_counts = df["user_first_name"].value_counts().reset_index()
-    user_task_counts.columns = ["User", "Task Count"]
-    bar_fig = px.bar(user_task_counts, x="User", y="Task Count", title="Task Distribution by User", color="Task Count", color_continuous_scale='Viridis')
-    st.plotly_chart(bar_fig, use_container_width=True)
-
-# Tab 3: Analytics
-with tab3:
-    st.subheader("📈 Hours Over Time")
-    time_df = df.groupby([df["started_at"].dt.date])['Hours'].sum().reset_index()
-    line_fig = px.line(time_df, x="started_at", y="Hours", title="Total Hours Over Time", markers=True, color_discrete_sequence=['#FF5733'])
-    st.plotly_chart(line_fig, use_container_width=True)
-
-    st.subheader("🏆 Top 5 Users by Hours")
-    top_users = df.groupby('user_first_name')["Hours"].sum().nlargest(5).reset_index()
-    st.dataframe(top_users, use_container_width=True)
-
-# Tab 4: Task Completion Patterns
-with tab4:
-    st.subheader("📊 Task Completion Trends")
-    df["Weekday"] = df["started_at"].dt.day_name()
-    weekday_counts = df["Weekday"].value_counts().reindex(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])
-
-    bar_fig = px.bar(weekday_counts, x=weekday_counts.index, y=weekday_counts.values, title="Tasks Completed by Day of the Week", color=weekday_counts.values, color_continuous_scale='Viridis')
-    st.plotly_chart(bar_fig, use_container_width=True)
-
-# Tab 5: Lemmatized Words
-with tab5:
-    st.subheader("🔤 Lemmatized Words Table")
-    st.dataframe(df[['task', 'Lemmatized_Words']].dropna(), use_container_width=True)
-
-# Tab 6: Word Cloud
-with tab6:
-    st.subheader("☁️ Task Word Cloud")
-    all_words = ' '.join(df['Lemmatized_Words'].dropna())
-    wordcloud = WordCloud(background_color='white', colormap='viridis', width=800, height=400).generate(all_words)
-    fig, ax = plt.subplots()
-    ax.imshow(wordcloud, interpolation='bilinear')
-    ax.axis('off')
-    st.pyplot(fig)
+# Tabs for Visua
